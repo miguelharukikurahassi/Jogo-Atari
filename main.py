@@ -11,6 +11,10 @@ def keydown(evt):
     keys[evt.code] = True
     if evt.code in ["Space", "ArrowUp", "ArrowDown"]:
         evt.preventDefault()
+        
+    # Lógica de Restart! Se o jogo acabou e apertarmos Enter, nós reiniciamos tudo!
+    if (game_state["game_over"] or game_state["victory"]) and evt.code == "Enter":
+        restart_game()
 
 def keyup(evt):
     keys[evt.code] = False
@@ -18,7 +22,7 @@ def keyup(evt):
 document.addEventListener("keydown", create_proxy(keydown))
 document.addEventListener("keyup", create_proxy(keyup))
 
-# Estado Global Modernizado!
+# Estado Global do Jogo
 game_state = {
     "wave": 1,
     "max_waves": 3,
@@ -53,7 +57,6 @@ class PowerUp:
         self.w = 20
         self.h = 20
         self.speed = 2.5
-        # 3 Tipos de Upgrade
         self.type = random.choice(["machine_gun", "spread", "speed"])
         self.colors = {"machine_gun": "#FF2222", "spread": "#22FF22", "speed": "#2222FF"}
         
@@ -85,7 +88,7 @@ class Player:
         self.bullets = []
         
         self.weapon = "normal" 
-        self.shoot_timer = 0 # Para cadência de tiros
+        self.shoot_timer = 0 
 
     def update(self):
         if keys.get("ArrowLeft", False) or keys.get("KeyA", False): self.x -= self.speed
@@ -95,9 +98,8 @@ class Player:
         if self.x + self.w > canvas.width: self.x = canvas.width - self.w
             
         for b in self.bullets: b.update()
-        self.bullets = [b for b in self.bullets if b.y > 0] # remove fora da tela
+        self.bullets = [b for b in self.bullets if b.y > 0] 
         
-        # Sistema de metralhadora press-to-shoot
         if self.shoot_timer > 0:
             self.shoot_timer -= 1
         
@@ -109,10 +111,10 @@ class Player:
             if len(self.bullets) < 3:
                 self.bullets.append(Bullet(self.x + self.w/2 - 2, self.y))
                 self.shoot_timer = 15
-        elif self.weapon == "machine_gun": # Laser veloz e ininterrupto!
+        elif self.weapon == "machine_gun": 
             self.bullets.append(Bullet(self.x + self.w/2 - 2, self.y, color="#FF4444"))
             self.shoot_timer = 6
-        elif self.weapon == "spread": # Disparo Triplo na diagonal (Spread Gun tipo Contra)
+        elif self.weapon == "spread": 
             if len(self.bullets) < 12:
                 self.bullets.append(Bullet(self.x + self.w/2 - 2, self.y, dx=0, color="#44FF44"))
                 self.bullets.append(Bullet(self.x + self.w/2 - 2, self.y, dx=-3, color="#44FF44"))
@@ -123,27 +125,22 @@ class Player:
         for b in self.bullets: b.draw()
         if img: ctx.drawImage(img, self.x, self.y, self.w, self.h)
 
+
 class AlienSwarm:
     def __init__(self, wave):
         self.aliens = []
         self.w = 50
         self.h = 50
-        
         self.direction = 1
-        # Velocidade escala conforme as ondas de ataque
         self.speed = 0.5 + (wave * 0.4) 
         
-        # Criação inteligente baseada na fase
         for row in range(4):
             for col in range(8):
                 alien_type = "normal"
                 hp = 1
-                
-                # Fase 2: Fileira da frente vira Alien Tank (precisa de muito tiro)
                 if wave >= 2 and row == 3:
                     alien_type = "tank"
                     hp = 4
-                # Fase 3: Tropa do fundo vira Rápida
                 if wave >= 3 and row == 0:
                     alien_type = "fast"
                 
@@ -158,7 +155,7 @@ class AlienSwarm:
         
         for a in self.aliens:
             dx = self.speed * self.direction
-            if a["type"] == "fast": dx *= 1.8 # Alien ágil corre pela fileira!
+            if a["type"] == "fast": dx *= 1.8 
             a["x"] += dx
             
             if a["x"] + self.w > canvas.width - 20 or a["x"] < 20:
@@ -176,22 +173,22 @@ class AlienSwarm:
         if not img: return
         for a in self.aliens:
             ctx.save()
-            # Diferenciando visualmente com css filter via Engine Canvas!!
             if a["type"] == "tank":
                 ctx.translate(a["x"] + self.w/2, a["y"] + self.h/2)
-                ctx.scale(1.2, 1.2) # Tank é mais gordo
-                ctx.filter = "hue-rotate(90deg) brightness(1.5)" # Amarelo vibrante
+                ctx.scale(1.2, 1.2)
+                ctx.filter = "hue-rotate(90deg) brightness(1.5)"
                 ctx.drawImage(img, -self.w/2, -self.h/2, self.w, self.h)
             elif a["type"] == "fast":
                 ctx.translate(a["x"], a["y"])
-                ctx.filter = "hue-rotate(220deg)" # Azul celeste com roxo
+                ctx.filter = "hue-rotate(220deg)" 
                 ctx.drawImage(img, 0, 0, self.w, self.h)
             else:
                 ctx.translate(a["x"], a["y"])
                 ctx.drawImage(img, 0, 0, self.w, self.h)
             ctx.restore()
 
-# Inicialização limpa
+
+# Declarando e Instanciando Classes Iniciais
 player = Player()
 swarm = None
 assets = {"loaded": 0, "player": window.Image.new(), "alien": window.Image.new()}
@@ -200,7 +197,6 @@ def check_collisions():
     global swarm
     surviving_aliens = []
     
-    # 1. Colisão: Tiros vs Tropas
     for a in swarm.aliens:
         hit = False
         for b in list(player.bullets):
@@ -212,12 +208,10 @@ def check_collisions():
                 player.bullets.remove(b)
                 a["hp"] -= 1
                 
-                # Alien Destruído
                 if a["hp"] <= 0:
                     score_pts = 10 if a["type"] == "normal" else (30 if a["type"]=="tank" else 20)
                     game_state["score"] += score_pts
                     
-                    # 15% de chance de Spawnar Item de Upgrade!
                     if random.random() < 0.15:
                         game_state["items"].append(PowerUp(a["x"], a["y"]))
                 break
@@ -225,68 +219,78 @@ def check_collisions():
         if a["hp"] > 0: surviving_aliens.append(a)
     swarm.aliens = surviving_aliens
     
-    # 2. Colisão: Player Coletando Upgrades
     for item in list(game_state["items"]):
         if item.x < player.x + player.w and item.x + item.w > player.x and item.y < player.y + player.h and item.y + item.h > player.y:
-            if item.type == "speed": 
-                player.speed = 10.0 # Bônus de Esquiva e Movimentação
-            else: 
-                player.weapon = item.type # Machine Gun ou Spread
+            if item.type == "speed": player.speed = 10.0
+            else: player.weapon = item.type
             game_state["items"].remove(item)
+
+# Função para Ressuscitar o Jogo (Restart System)
+def restart_game():
+    global player, swarm
+    
+    game_state["wave"] = 1
+    game_state["score"] = 0
+    game_state["game_over"] = False
+    game_state["victory"] = False
+    game_state["items"] = []
+    
+    player = Player()
+    swarm = AlienSwarm(1)
+    
+    # Chama o Loop da Morte de volta a vida!
+    window.requestAnimationFrame(proxy_game_loop)
+
 
 def game_loop(time_stamp):
     global swarm
     
-    # Renderização de fundo dinâmico (efeito rastro leve)
     ctx.fillStyle = "rgba(5, 5, 16, 0.5)"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     
     if game_state["game_over"]:
         ctx.fillStyle = "rgba(255, 0, 0, 0.7)"
-        ctx.fillRect(0, canvas.height/2 - 60, canvas.width, 100)
-        ctx.fillStyle = "#FFF"
-        ctx.font = "bold 50px Courier New"
-        ctx.textAlign = "center"
-        ctx.fillText("TERRA DESTRUÍDA", canvas.width/2, canvas.height/2)
-        return
-
-    if game_state["victory"]:
-        ctx.fillStyle = "rgba(0, 255, 0, 0.7)"
         ctx.fillRect(0, canvas.height/2 - 60, canvas.width, 140)
         ctx.fillStyle = "#FFF"
         ctx.font = "bold 50px Courier New"
         ctx.textAlign = "center"
+        ctx.fillText("TERRA DESTRUÍDA", canvas.width/2, canvas.height/2)
+        ctx.font = "20px Courier New"
+        ctx.fillText("> Pressione [ENTER] para Tentar Novamente <", canvas.width/2, canvas.height/2 + 50)
+        return
+
+    if game_state["victory"]:
+        ctx.fillStyle = "rgba(0, 255, 0, 0.7)"
+        ctx.fillRect(0, canvas.height/2 - 60, canvas.width, 160)
+        ctx.fillStyle = "#FFF"
+        ctx.font = "bold 50px Courier New"
+        ctx.textAlign = "center"
         ctx.fillText("UNIVERSO SALVO!", canvas.width/2, canvas.height/2 - 10)
-        ctx.font = "bold 30px Courier New"
-        ctx.fillText(f"Score Final: {game_state['score']}", canvas.width/2, canvas.height/2 + 40)
+        ctx.font = "bold 25px Courier New"
+        ctx.fillText(f"Score Final: {game_state['score']}", canvas.width/2, canvas.height/2 + 30)
+        ctx.font = "20px Courier New"
+        ctx.fillText("> Pressione [ENTER] para Jogar Novamente <", canvas.width/2, canvas.height/2 + 70)
         return
         
-    # Verificar se as hordas da fase foram extintas, e iniciar a próxima horda
     if len(swarm.aliens) == 0:
         if game_state["wave"] < game_state["max_waves"]:
             game_state["wave"] += 1
-            swarm = AlienSwarm(game_state["wave"]) # Ressuscita Aliens (mais difíceis)
+            swarm = AlienSwarm(game_state["wave"]) 
             player.bullets.clear()
         else:
             game_state["victory"] = True
             return
 
-    # Processamento de Física Base
     player.update()
     swarm.update()
     for i in game_state["items"]: i.update()
-    
-    # Destrói os items que escaparam pro limite da tela, pra evitar lag
     game_state["items"] = [i for i in game_state["items"] if i.y < canvas.height]
-    
     check_collisions()
     
-    # Engine De Renderização final
     player.draw(assets["player"])
     swarm.draw(assets["alien"])
     for i in game_state["items"]: i.draw()
     
-    # Interface de HUD
     ctx.fillStyle = "#FFF"
     ctx.font = "18px Courier New"
     ctx.textAlign = "left"
