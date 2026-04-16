@@ -46,18 +46,30 @@ def main():
                 
                 print("Novos gráficos 8-bit de naves e aliens desenhados no canvas!")
 
+        def on_error(evt):
+            ctx.fillStyle = "#FF0000"
+            ctx.font = "18px Courier New"
+            ctx.fillText("ERRO: O navegador não encontrou os assets gráficos!", canvas.width / 2, 200)
+            ctx.fillStyle = "#FFAAAA"
+            ctx.fillText("Motivo 1: Cache (Aperte Ctrl + F5 para limpar a memória do navegador).", canvas.width / 2, 250)
+            ctx.fillText("Motivo 2: O GitHub Pages ainda está hospedando os arquivos (espere 5 min).", canvas.width / 2, 280)
+
         # Pyodide: create_proxy cria uma ponte entre essa função Python e os 'Event Listeners' do navegador do JS
         on_load_proxy = create_proxy(on_load)
+        on_error_proxy = create_proxy(on_error)
 
         # Carregando imagem da nave do jogador
         ship_img = window.Image.new()
         ship_img.onload = on_load_proxy
-        ship_img.src = "./assets/player.png"
+        ship_img.onerror = on_error_proxy
+        # Remover o ./ pode ajudar dependendo do contexto do GitHub Pages
+        ship_img.src = "assets/player.png"
         
         # Carregando imagem do alienígena
         alien_img = window.Image.new()
         alien_img.onload = on_load_proxy
-        alien_img.src = "./assets/alien.png"
+        alien_img.onerror = on_error_proxy
+        alien_img.src = "assets/alien.png"
 
     else:
         print("Erro: Canvas não achado.")
